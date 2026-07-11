@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Merge Conflict — Vertical Slice</title>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --panel: #12141b;
+    --branchA: #4fd8ff;
+    --branchB: #ff4fd8;
+    --neutral: #e8e8ec;
+    --paradox: #ffb347;
+    --text: #c9ccd6;
+    --muted: #6b7080;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-monospace, "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 16px 40px;
+  }
+  h1 {
+    font-size: 14px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 2px 0;
+    width: 100%;
+    max-width: 800px;
+  }
+  .subtitle { font-size: 12.5px; color: var(--muted); margin-bottom: 16px; width: 100%; max-width: 800px; }
+  #stage {
+    width: 100%;
+    max-width: 800px;
+    position: relative;
+    border: 1px solid #262a36;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  canvas { display: block; background: var(--bg); width: 100%; height: auto; }
+  #topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    width: 100%;
+    max-width: 800px;
+    margin-bottom: 8px;
+  }
+  #phaseBanner { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: var(--neutral); }
+  #levelName { font-size: 11px; color: var(--muted); }
+  #instructions {
+    width: 100%;
+    max-width: 800px;
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-top: 10px;
+    min-height: 16px;
+  }
+  #controls {
+    width: 100%;
+    max-width: 800px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  button {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid #2a2f3d;
+    padding: 9px 14px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  button:hover, button:focus-visible { border-color: var(--neutral); outline: none; }
+  #btnLockA { border-color: var(--branchA); color: var(--branchA); }
+  #btnLockB { border-color: var(--branchB); color: var(--branchB); }
+  #stampUI {
+    display: none;
+    width: 100%;
+    max-width: 800px;
+    margin-top: 16px;
+    padding: 14px 16px;
+    border: 1px solid var(--paradox);
+    border-radius: 6px;
+    background: rgba(255,179,71,0.06);
+    font-size: 12.5px;
+  }
+  #stampUI .row { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+  #stampA { border-color: var(--branchA); color: var(--branchA); flex: 1; min-width: 200px; }
+  #stampB { border-color: var(--branchB); color: var(--branchB); flex: 1; min-width: 200px; }
+  #paradoxNote {
+    display: none;
+    width: 100%;
+    max-width: 800px;
+    margin-top: 10px;
+    padding: 10px 14px;
+    border: 1px solid var(--paradox);
+    color: var(--paradox);
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  #devbar {
+    width: 100%;
+    max-width: 800px;
+    margin-top: 22px;
+    padding-top: 14px;
+    border-top: 1px dashed #262a36;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .levelBtn { cursor: pointer; text-decoration: underline; color: var(--muted); }
+  .levelBtn:hover { color: var(--neutral); }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-top: 12px; width: 100%; max-width: 800px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+</style>
+</head>
+<body>
+  <h1>Merge Conflict</h1>
+  <div class="subtitle" id="levelSubtitle">Vertical slice — chapter 1</div>
+
+  <div id="topbar">
+    <div id="phaseBanner">—</div>
+    <div id="levelName"></div>
+  </div>
+
+  <div id="stage">
+    <canvas id="game" width="800" height="450"></canvas>
+  </div>
+
+  <div id="instructions"></div>
+
+  <div class="legend">
+    <span><span class="dot" style="background:#4fd8ff"></span> Branch A</span>
+    <span><span class="dot" style="background:#ff4fd8"></span> Branch B</span>
+    <span><span class="dot" style="background:#e8e8ec"></span> Merged / neutral</span>
+    <span><span class="dot" style="background:#ffb347"></span> Paradox / flicker</span>
+  </div>
+
+  <div id="controls">
+    <div>
+      <button id="btnLockA">Lock Branch A → Play Branch B</button>
+      <button id="btnLockB">Lock Branch B → Merge</button>
+    </div>
+    <button id="btnRestart">Restart Level</button>
+  </div>
+
+  <div id="stampUI">
+    <div>Conflict on <strong id="conflictLabel"></strong> — both branches changed it, differently.</div>
+    <div class="row">
+      <button id="stampA">Keep Branch A (<span id="valA"></span>)</button>
+      <button id="stampB">Keep Branch B (<span id="valB"></span>)</button>
+    </div>
+  </div>
+
+  <div id="paradoxNote"></div>
+
+  <div id="devbar">
+    <span>DEV:</span>
+    <span class="levelBtn" data-level="0">Level 0 — Fork Point</span>
+    <span>·</span>
+    <span class="levelBtn" data-level="1">Level 1 — Crate/Plate/Door/Key</span>
+    <span>·</span>
+    <span>Move: Arrows/WASD · Jump: Up/W/Space · Interact: E</span>
+  </div>
+
+  <script>
+/**
+ * Merge Conflict — Core Engine
+ * Pure state/logic layer: no rendering, no DOM, no input.
+ * Runs identically under Node (for tests) and in the browser (for the game).
+ */
+(function (root) {
+  'use strict';
+
+  function cloneState(state) {
+    return JSON.parse(JSON.stringify(state));
+  }
+
+  function setProp(state, entityId, prop, value) {
+    if (!state[entityId]) state[entityId] = {};
+    state[entityId][prop] = value;
+  }
+
+  function getProp(state, entityId, prop, fallback) {
+    if (!state[entityId] || state[entityId][prop] === undefined) return fallback;
+    return state[entityId][prop];
+  }
+
+  // { entityId: { prop: newValue } } for every prop that differs from base.
+  function diffState(branch, base) {
+    var diff = {};
+    var ids = new Set(Object.keys(branch).concat(Object.keys(base)));
+    ids.forEach(function (id) {
+      var b = branch[id] || {};
+      var ba = base[id] || {};
+      var props = new Set(Object.keys(b).concat(Object.keys(ba)));
+      props.forEach(function (p) {
+        var bv = b[p];
+        var av = ba[p];
+        if (JSON.stringify(bv) !== JSON.stringify(av)) {
+          if (!diff[id]) diff[id] = {};
+          diff[id][p] = bv;
+        }
+      });
+    });
+    return diff;
+  }
+
+  function touchedKeys(diff) {
+    var keys = new Set();
+    Object.keys(diff).forEach(function (id) {
+      Object.keys(diff[id]).forEach(function (p) {
+        keys.add(id + '.' + p);
+      });
+    });
+    return keys;
+  }
+
+  function splitKey(key) {
+    var idx = key.lastIndexOf('.');
+    return [key.slice(0, idx), key.slice(idx + 1)];
+  }
+
+  // Keys touched by exactly one branch merge silently.
+  // Keys touched by both branches with the same value merge silently.
+  // Keys touched by both branches with different values become conflicts.
+  function threeWayMerge(base, branchA, branchB) {
+    var merged = cloneState(base);
+    var diffA = diffState(branchA, base);
+    var diffB = diffState(branchB, base);
+    var touchedA = touchedKeys(diffA);
+    var touchedB = touchedKeys(diffB);
+    var conflicts = [];
+    var allKeys = new Set(Array.from(touchedA).concat(Array.from(touchedB)));
+
+    allKeys.forEach(function (key) {
+      var parts = splitKey(key);
+      var entityId = parts[0];
+      var prop = parts[1];
+      var inA = touchedA.has(key);
+      var inB = touchedB.has(key);
+
+      if (inA && !inB) {
+        setProp(merged, entityId, prop, diffA[entityId][prop]);
+      } else if (inB && !inA) {
+        setProp(merged, entityId, prop, diffB[entityId][prop]);
+      } else {
+        var aVal = diffA[entityId][prop];
+        var bVal = diffB[entityId][prop];
+        if (JSON.stringify(aVal) === JSON.stringify(bVal)) {
+          setProp(merged, entityId, prop, aVal);
+        } else {
+          conflicts.push({ key: key, entityId: entityId, prop: prop, aValue: aVal, bValue: bVal });
+        }
+      }
+    });
+
+    return { merged: merged, conflicts: conflicts };
+  }
+
+  function stampConflict(merged, conflict, choice) {
+    var value = choice === 'A' ? conflict.aValue : conflict.bValue;
+    setProp(merged, conflict.entityId, conflict.prop, value);
+    return merged;
+  }
+
+  // edges: [{ promise: 'door.open', dependsOn: 'plate.weighted', require: v => v === true }]
+  // A promise is paradoxed if its dependency doesn't hold, or if its dependency is itself
+  // paradoxed (paradox propagates transitively through the graph until it reaches fixed point).
+  function CausalityGraph(edges) {
+    this.edges = edges || [];
+  }
+
+  CausalityGraph.prototype.evaluateParadoxes = function (state) {
+    var paradoxed = new Set();
+    var changed = true;
+    var guard = 0;
+    var maxGuard = this.edges.length + 5;
+
+    while (changed && guard < maxGuard) {
+      changed = false;
+      guard++;
+      this.edges.forEach(function (edge) {
+        if (paradoxed.has(edge.promise)) return;
+        var parts = splitKey(edge.dependsOn);
+        var depValue = getProp(state, parts[0], parts[1]);
+        var depParadoxed = paradoxed.has(edge.dependsOn);
+        var holds = !depParadoxed && edge.require(depValue);
+        if (!holds) {
+          paradoxed.add(edge.promise);
+          changed = true;
+        }
+      });
+    }
+
+    return paradoxed;
+  };
+
+  var MergeEngine = {
+    cloneState: cloneState,
+    setProp: setProp,
+    getProp: getProp,
+    diffState: diffState,
+    touchedKeys: touchedKeys,
+    splitKey: splitKey,
+    threeWayMerge: threeWayMerge,
+    stampConflict: stampConflict,
+    CausalityGraph: CausalityGraph
+  };
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = MergeEngine;
+  }
+  if (typeof root !== 'undefined' && root) {
+    root.MergeEngine = MergeEngine;
+  }
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
+
+  </script>
+  <script>
+(function () {
+  'use strict';
+
+  var canvas = document.getElementById('game');
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+
+  var phaseBanner = document.getElementById('phaseBanner');
+  var levelNameEl = document.getElementById('levelName');
+  var levelSubtitleEl = document.getElementById('levelSubtitle');
+  var instructionsEl = document.getElementById('instructions');
+  var stampUI = document.getElementById('stampUI');
+  var paradoxNote = document.getElementById('paradoxNote');
+
+  var COLORS = {
+    branchA: '#4fd8ff',
+    branchB: '#ff4fd8',
+    neutral: '#e8e8ec'
+  };
+
+  var GRAVITY = 1800;
+  var MOVE_SPEED = 230;
+  var JUMP_VELOCITY = -640;
+
+  var PHASE = {
+    RECORD_A: 'RECORD_A',
+    RECORD_B: 'RECORD_B',
+    STAMPING: 'STAMPING',
+    RESULT: 'RESULT',
+    WIN: 'WIN'
+  };
+
+  function level0() {
+    return {
+      id: 0,
+      name: 'Level 0 — Fork Point',
+      subtitle: 'Disjoint changes merge for free — no stamping required.',
+      instructions: [
+        'BRANCH A: walk to the LEFT torch and press E to light it.',
+        'BRANCH B: walk to the RIGHT torch and press E to light it.',
+        'Both torches lit, zero conflicts. Walk through the gate.'
+      ],
+      spawn: { x: 40, y: 350 },
+      floor: { x: -40, y: 400, w: 880, h: 60 },
+      platforms: [],
+      walls: [
+        { x: -40, y: -40, w: 40, h: 480 },
+        { x: 800, y: -40, w: 40, h: 480 }
+      ],
+      torch1: { x: 90, y: 330, w: 22, h: 70 },
+      torch2: { x: 688, y: 330, w: 22, h: 70 },
+      exitGate: { x: 380, y: 250, w: 40, h: 150 },
+      hasCrate: false,
+      baseState: { torch1: { lit: false }, torch2: { lit: false } },
+      causality: [],
+      deriveExitOpen: function (state) {
+        return !!(state && state.torch1 && state.torch1.lit && state.torch2 && state.torch2.lit);
+      }
+    };
+  }
+
+  function level1() {
+    return {
+      id: 1,
+      name: 'Level 1 — Crate, Plate, Door, Key',
+      subtitle: 'One object, touched two ways, is the whole puzzle.',
+      instructions: [
+        'BRANCH A: push the crate LEFT onto the plate. The door opens.',
+        'BRANCH B: push the crate RIGHT, climb it, press E on the ledge to take the key.',
+        'Door-open and key-in-hand merge free. Only the crate conflicts — choose.'
+      ],
+      spawn: { x: 40, y: 350 },
+      floor: { x: -40, y: 400, w: 880, h: 60 },
+      platforms: [ { x: 430, y: 270, w: 140, h: 20 } ],
+      walls: [
+        { x: -40, y: -40, w: 40, h: 480 },
+        { x: 800, y: -40, w: 40, h: 480 }
+      ],
+      plateZone: { x: 130, y: 380, w: 90, h: 20 },
+      crateStart: { x: 270, y: 360, w: 40, h: 40 },
+      key: { x: 478, y: 240, w: 24, h: 24 },
+      door: { x: 690, y: 250, w: 30, h: 150 },
+      exitFlag: { x: 750, y: 340, w: 24, h: 60 },
+      hasCrate: true,
+      baseState: {
+        crate: { zone: 'start' },
+        plate: { weighted: false },
+        door: { open: false },
+        key: { held: false }
+      },
+      causality: [
+        { promise: 'plate.weighted', dependsOn: 'crate.zone', require: function (v) { return v === 'plate'; } },
+        { promise: 'door.open', dependsOn: 'plate.weighted', require: function (v) { return v === true; } }
+      ],
+      classifyCrateZone: function (x) {
+        if (x <= 200) return 'plate';
+        if (x >= 330) return 'ledge';
+        return 'start';
+      }
+    };
+  }
+
+  var LEVELS = [level0(), level1()];
+
+  var game = {
+    levelIndex: 0,
+    level: null,
+    phase: PHASE.RECORD_A,
+    player: null,
+    crate: null,
+    branchAState: null,
+    branchBState: null,
+    liveFlags: null,
+    mergedState: null,
+    conflicts: [],
+    conflictIndex: 0,
+    paradoxes: new Set(),
+    keys: {}
+  };
+
+  function cloneBase(base) {
+    return JSON.parse(JSON.stringify(base));
+  }
+
+  function loadLevel(idx) {
+    game.levelIndex = idx;
+    game.level = LEVELS[idx];
+    resetToRecordA();
+  }
+
+  function resetToRecordA() {
+    var lvl = game.level;
+    game.phase = PHASE.RECORD_A;
+    game.player = { x: lvl.spawn.x, y: lvl.spawn.y, w: 26, h: 40, vx: 0, vy: 0, onGround: false, facing: 1 };
+    game.crate = lvl.hasCrate ? { x: lvl.crateStart.x, y: lvl.crateStart.y, w: lvl.crateStart.w, h: lvl.crateStart.h } : null;
+    game.liveFlags = cloneBase(lvl.baseState);
+    game.branchAState = null;
+    game.branchBState = null;
+    game.mergedState = null;
+    game.conflicts = [];
+    game.conflictIndex = 0;
+    game.paradoxes = new Set();
+    levelNameEl.textContent = lvl.name;
+    levelSubtitleEl.textContent = lvl.subtitle;
+    updateBanner();
+  }
+
+  function beginRecordB() {
+    if (game.phase !== PHASE.RECORD_A) return;
+    game.branchAState = JSON.parse(JSON.stringify(game.liveFlags));
+    game.phase = PHASE.RECORD_B;
+    var lvl = game.level;
+    game.player.x = lvl.spawn.x; game.player.y = lvl.spawn.y; game.player.vx = 0; game.player.vy = 0;
+    if (game.crate) { game.crate.x = lvl.crateStart.x; game.crate.y = lvl.crateStart.y; }
+    game.liveFlags = cloneBase(lvl.baseState);
+    updateBanner();
+  }
+
+  function lockAndMerge() {
+    if (game.phase !== PHASE.RECORD_B) return;
+    game.branchBState = JSON.parse(JSON.stringify(game.liveFlags));
+    var lvl = game.level;
+    var result = MergeEngine.threeWayMerge(lvl.baseState, game.branchAState, game.branchBState);
+    game.mergedState = result.merged;
+    game.conflicts = result.conflicts;
+    game.conflictIndex = 0;
+
+    if (game.conflicts.length === 0) {
+      finalizeMerge();
+    } else {
+      game.phase = PHASE.STAMPING;
+    }
+    updateBanner();
+  }
+
+  function stamp(choice) {
+    if (game.phase !== PHASE.STAMPING) return;
+    var conflict = game.conflicts[game.conflictIndex];
+    MergeEngine.stampConflict(game.mergedState, conflict, choice);
+    game.conflictIndex++;
+    if (game.conflictIndex >= game.conflicts.length) {
+      finalizeMerge();
+    }
+    updateBanner();
+  }
+
+  function finalizeMerge() {
+    var lvl = game.level;
+    if (lvl.causality && lvl.causality.length) {
+      var graph = new MergeEngine.CausalityGraph(lvl.causality);
+      game.paradoxes = graph.evaluateParadoxes(game.mergedState);
+    } else {
+      game.paradoxes = new Set();
+    }
+    game.phase = PHASE.RESULT;
+    game.player.x = lvl.spawn.x; game.player.y = lvl.spawn.y; game.player.vx = 0; game.player.vy = 0;
+    if (game.crate) {
+      var zone = game.mergedState.crate ? game.mergedState.crate.zone : 'start';
+      game.crate.x = zone === 'plate' ? 160 : (zone === 'ledge' ? 390 : lvl.crateStart.x);
+    }
+    updateBanner();
+  }
+
+  function aabbOverlap(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
+  function expand(rect, m) {
+    return { x: rect.x - m, y: rect.y - m, w: rect.w + m * 2, h: rect.h + m * 2 };
+  }
+
+  function isGateSolidNow() {
+    var lvl = game.level;
+    if (game.phase === PHASE.RESULT || game.phase === PHASE.WIN) {
+      var open = lvl.deriveExitOpen ? lvl.deriveExitOpen(game.mergedState) : false;
+      return !open;
+    }
+    return false;
+  }
+
+  function isDoorSolidNow() {
+    if (game.phase === PHASE.RESULT || game.phase === PHASE.WIN) {
+      if (!game.mergedState || !game.mergedState.door) return true;
+      var open = game.mergedState.door.open;
+      if (!open) return true;
+      var paradoxed = game.paradoxes && game.paradoxes.has('door.open');
+      if (!paradoxed) return false;
+      var t = Math.floor(performance.now() / 800) % 2;
+      return t === 0;
+    }
+    return true;
+  }
+
+  function collidableRects() {
+    var lvl = game.level;
+    var rects = [lvl.floor].concat(lvl.walls, lvl.platforms);
+    if (lvl.id === 0 && isGateSolidNow()) rects.push(lvl.exitGate);
+    if (lvl.id === 1 && isDoorSolidNow()) rects.push(lvl.door);
+    return rects;
+  }
+
+  function movePlayer(dt) {
+    var lvl = game.level;
+    var p = game.player;
+    var left = game.keys['ArrowLeft'] || game.keys['a'];
+    var right = game.keys['ArrowRight'] || game.keys['d'];
+    var jumpPressed = game.keys['ArrowUp'] || game.keys['w'] || game.keys[' '];
+
+    p.vx = 0;
+    if (left) { p.vx = -MOVE_SPEED; p.facing = -1; }
+    if (right) { p.vx = MOVE_SPEED; p.facing = 1; }
+
+    if (jumpPressed && p.onGround) {
+      p.vy = JUMP_VELOCITY;
+      p.onGround = false;
+    }
+
+    p.vy += GRAVITY * dt;
+
+    if (lvl.hasCrate && game.crate && (game.phase === PHASE.RECORD_A || game.phase === PHASE.RECORD_B)) {
+      var nextX = p.x + p.vx * dt;
+      var pAfter = { x: nextX, y: p.y, w: p.w, h: p.h };
+      if (aabbOverlap(pAfter, game.crate)) {
+        var crateNext = { x: game.crate.x + p.vx * dt, y: game.crate.y, w: game.crate.w, h: game.crate.h };
+        var blocked = lvl.walls.some(function (w) { return aabbOverlap(crateNext, w); });
+        if (!blocked) {
+          game.crate.x = crateNext.x;
+        } else {
+          p.vx = 0;
+        }
+      }
+    }
+
+    p.x += p.vx * dt;
+    var solidsH = collidableRects();
+    if (game.crate) solidsH = solidsH.concat([game.crate]);
+    solidsH.forEach(function (r) {
+      if (aabbOverlap(p, r)) {
+        if (p.vx > 0) p.x = r.x - p.w;
+        else if (p.vx < 0) p.x = r.x + r.w;
+      }
+    });
+
+    p.y += p.vy * dt;
+    p.onGround = false;
+    var solidsV = collidableRects();
+    if (game.crate) solidsV = solidsV.concat([game.crate]);
+    solidsV.forEach(function (r) {
+      if (aabbOverlap(p, r)) {
+        if (p.vy > 0) { p.y = r.y - p.h; p.vy = 0; p.onGround = true; }
+        else if (p.vy < 0) { p.y = r.y + r.h; p.vy = 0; }
+      }
+    });
+
+    if (p.x < -30) p.x = -30;
+    if (p.x + p.w > 830) p.x = 830 - p.w;
+  }
+
+  function updateLiveFlags() {
+    var lvl = game.level;
+    var p = game.player;
+    if (lvl.id === 0) {
+      if (game.keys['e']) {
+        if (aabbOverlap(p, expand(lvl.torch1, 10))) game.liveFlags.torch1.lit = true;
+        if (aabbOverlap(p, expand(lvl.torch2, 10))) game.liveFlags.torch2.lit = true;
+      }
+    } else if (lvl.id === 1) {
+      var zone = lvl.classifyCrateZone(game.crate.x);
+      game.liveFlags.crate.zone = zone;
+      game.liveFlags.plate.weighted = (zone === 'plate');
+      game.liveFlags.door.open = (zone === 'plate');
+      if (game.keys['e'] && aabbOverlap(p, expand(lvl.key, 10))) {
+        game.liveFlags.key.held = true;
+      }
+    }
+  }
+
+  function checkWin() {
+    var lvl = game.level;
+    var p = game.player;
+    if (game.phase !== PHASE.RESULT) return;
+    if (lvl.id === 0) {
+      var open = lvl.deriveExitOpen ? lvl.deriveExitOpen(game.mergedState) : false;
+      if (open && aabbOverlap(p, lvl.exitGate)) game.phase = PHASE.WIN;
+    } else if (lvl.id === 1) {
+      if (aabbOverlap(p, lvl.exitFlag) && !isDoorSolidNow()) game.phase = PHASE.WIN;
+    }
+    if (game.phase === PHASE.WIN) updateBanner();
+  }
+
+  function liveOrMergedLit(torchId) {
+    if (game.phase === PHASE.RECORD_A || game.phase === PHASE.RECORD_B) {
+      return game.liveFlags[torchId] && game.liveFlags[torchId].lit;
+    }
+    return game.mergedState && game.mergedState[torchId] && game.mergedState[torchId].lit;
+  }
+
+  function liveOrMergedWeighted() {
+    if (game.phase === PHASE.RECORD_A || game.phase === PHASE.RECORD_B) {
+      return game.liveFlags.plate && game.liveFlags.plate.weighted;
+    }
+    return game.mergedState && game.mergedState.plate && game.mergedState.plate.weighted;
+  }
+
+  function keyIsHeld() {
+    if (game.phase === PHASE.RECORD_A || game.phase === PHASE.RECORD_B) {
+      return game.liveFlags.key && game.liveFlags.key.held;
+    }
+    return game.mergedState && game.mergedState.key && game.mergedState.key.held;
+  }
+
+  function drawRect(r, color) {
+    ctx.fillStyle = color;
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+  }
+
+  function drawTorch(rect, lit) {
+    ctx.fillStyle = '#4a3423';
+    ctx.fillRect(rect.x + rect.w / 2 - 4, rect.y + 20, 8, rect.h - 20);
+    ctx.beginPath();
+    ctx.fillStyle = lit ? '#ffb347' : '#3a3f4c';
+    ctx.arc(rect.x + rect.w / 2, rect.y + 14, 12, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawGate(rect) {
+    var lvl = game.level;
+    var open = (game.phase === PHASE.RESULT || game.phase === PHASE.WIN) && lvl.deriveExitOpen(game.mergedState);
+    ctx.fillStyle = open ? 'rgba(232,232,236,0.12)' : '#e8e8ec';
+    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  }
+
+  function drawPlateMarker(rect, weighted) {
+    ctx.fillStyle = weighted ? 'rgba(255,179,71,0.55)' : 'rgba(255,179,71,0.15)';
+    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    ctx.strokeStyle = '#ffb347';
+    ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+  }
+
+  function drawKey(rect) {
+    ctx.fillStyle = '#ffd75e';
+    ctx.beginPath();
+    ctx.arc(rect.x + 8, rect.y + 12, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(rect.x + 12, rect.y + 8, 12, 6);
+  }
+
+  function drawDoor(rect) {
+    var solid = isDoorSolidNow();
+    var paradoxed = game.paradoxes && game.paradoxes.has('door.open');
+    if (paradoxed) {
+      ctx.fillStyle = solid ? 'rgba(255,179,71,0.9)' : 'rgba(255,179,71,0.22)';
+    } else {
+      ctx.fillStyle = solid ? '#7d8296' : 'rgba(125,130,150,0.15)';
+    }
+    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    if (paradoxed) {
+      ctx.strokeStyle = '#ffb347';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+    }
+  }
+
+  function drawFlag(rect) {
+    ctx.fillStyle = '#4fffb0';
+    ctx.fillRect(rect.x, rect.y, 4, rect.h);
+    ctx.beginPath();
+    ctx.moveTo(rect.x + 4, rect.y);
+    ctx.lineTo(rect.x + 24, rect.y + 10);
+    ctx.lineTo(rect.x + 4, rect.y + 20);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawPlayer() {
+    var p = game.player;
+    var color = COLORS.neutral;
+    if (game.phase === PHASE.RECORD_A) color = COLORS.branchA;
+    if (game.phase === PHASE.RECORD_B) color = COLORS.branchB;
+    ctx.fillStyle = color;
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+  }
+
+  function render() {
+    var lvl = game.level;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#0b0d12';
+    ctx.fillRect(0, 0, W, H);
+
+    var tint = null;
+    if (game.phase === PHASE.RECORD_A) tint = 'rgba(79,216,255,0.06)';
+    if (game.phase === PHASE.RECORD_B) tint = 'rgba(255,79,216,0.06)';
+    if (tint) { ctx.fillStyle = tint; ctx.fillRect(0, 0, W, H); }
+
+    drawRect(lvl.floor, '#20242f');
+    lvl.walls.forEach(function (w) { drawRect(w, '#12141b'); });
+    lvl.platforms.forEach(function (pl) { drawRect(pl, '#2a2f3d'); });
+
+    if (lvl.id === 0) {
+      drawTorch(lvl.torch1, liveOrMergedLit('torch1'));
+      drawTorch(lvl.torch2, liveOrMergedLit('torch2'));
+      drawGate(lvl.exitGate);
+    }
+
+    if (lvl.id === 1) {
+      drawPlateMarker(lvl.plateZone, liveOrMergedWeighted());
+      if (!keyIsHeld()) drawKey(lvl.key);
+      drawDoor(lvl.door);
+      drawFlag(lvl.exitFlag);
+    }
+
+    if (game.crate) drawRect(game.crate, '#8a6d3b');
+
+    drawPlayer();
+  }
+
+  function updateBanner() {
+    var lvl = game.level;
+    var text = '', sub = '';
+    if (game.phase === PHASE.RECORD_A) { text = 'BRANCH A — recording'; sub = lvl.instructions[0]; }
+    if (game.phase === PHASE.RECORD_B) { text = 'BRANCH B — recording'; sub = lvl.instructions[1]; }
+    if (game.phase === PHASE.STAMPING) { text = 'MERGE — conflict ' + (game.conflictIndex + 1) + ' / ' + game.conflicts.length; sub = 'Choose which branch is true.'; }
+    if (game.phase === PHASE.RESULT) { text = 'RESULT — playing the merged world'; sub = lvl.instructions[2] || 'Reach the exit.'; }
+    if (game.phase === PHASE.WIN) { text = 'LEVEL COMPLETE'; sub = 'Restart, or pick the next level below.'; }
+    phaseBanner.textContent = text;
+    instructionsEl.textContent = sub;
+
+    document.getElementById('btnLockA').style.display = (game.phase === PHASE.RECORD_A) ? 'inline-block' : 'none';
+    document.getElementById('btnLockB').style.display = (game.phase === PHASE.RECORD_B) ? 'inline-block' : 'none';
+
+    if (game.phase === PHASE.STAMPING) {
+      stampUI.style.display = 'block';
+      var c = game.conflicts[game.conflictIndex];
+      document.getElementById('conflictLabel').textContent = c.entityId + '.' + c.prop;
+      document.getElementById('valA').textContent = String(c.aValue);
+      document.getElementById('valB').textContent = String(c.bValue);
+    } else {
+      stampUI.style.display = 'none';
+    }
+
+    if (game.phase === PHASE.RESULT && game.paradoxes && game.paradoxes.size > 0) {
+      paradoxNote.style.display = 'block';
+      paradoxNote.textContent = 'PARADOX: ' + Array.from(game.paradoxes).join(', ') + ' — flickering. Time your move.';
+    } else {
+      paradoxNote.style.display = 'none';
+    }
+  }
+
+  window.addEventListener('keydown', function (e) {
+    game.keys[e.key] = true;
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].indexOf(e.key) !== -1) {
+      e.preventDefault();
+    }
+  });
+  window.addEventListener('keyup', function (e) {
+    game.keys[e.key] = false;
+  });
+
+  document.getElementById('btnLockA').addEventListener('click', beginRecordB);
+  document.getElementById('btnLockB').addEventListener('click', lockAndMerge);
+  document.getElementById('btnRestart').addEventListener('click', function () { resetToRecordA(); });
+  document.getElementById('stampA').addEventListener('click', function () { stamp('A'); });
+  document.getElementById('stampB').addEventListener('click', function () { stamp('B'); });
+  document.querySelectorAll('.levelBtn').forEach(function (btn) {
+    btn.addEventListener('click', function () { loadLevel(parseInt(btn.dataset.level, 10)); });
+  });
+
+  var last = performance.now();
+  function loop(now) {
+    var dt = Math.min((now - last) / 1000, 0.033);
+    last = now;
+
+    if (game.phase === PHASE.RECORD_A || game.phase === PHASE.RECORD_B || game.phase === PHASE.RESULT) {
+      movePlayer(dt);
+    }
+    if (game.phase === PHASE.RECORD_A || game.phase === PHASE.RECORD_B) {
+      updateLiveFlags();
+    }
+    if (game.phase === PHASE.RESULT) {
+      checkWin();
+    }
+
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  loadLevel(0);
+  requestAnimationFrame(loop);
+})();
+
+  </script>
+</body>
+</html>
