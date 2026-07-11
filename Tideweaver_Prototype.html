@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tideweaver — Prototype</title>
+<style>
+  :root{
+    --sand:#F3E9D6; --sand-deep:#E8D8BC;
+    --sea:#7FB5B0; --sea-deep:#4F8A87; --sea-ink:#2E5957;
+    --coral:#E08D6F; --coral-deep:#C46A4C;
+    --sky:#FBF6EC; --shell:#FFFDF8;
+    --ink:#33413F; --ink-soft:#6B7A77;
+    --gold:#E5B45A; --gold-deep:#C8923A;
+    --line:#DCD0B8;
+    --shadow:rgba(46,89,87,.16);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden}
+  body{
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    background:
+      radial-gradient(120% 80% at 50% -10%, #FCF8EF 0%, var(--sky) 45%, #F4ECDC 100%);
+    color:var(--ink);
+    display:flex;align-items:center;justify-content:center;
+    user-select:none;
+  }
+  /* ---- phone frame ---- */
+  #app{
+    position:relative;
+    width:min(440px,100vw);height:min(900px,100vh);
+    background:var(--sky);
+    overflow:hidden;
+    display:flex;flex-direction:column;
+  }
+  @media(min-width:460px){
+    #app{border-radius:34px;box-shadow:0 30px 70px -20px rgba(46,89,87,.4),0 0 0 1px var(--line);height:min(860px,96vh)}
+  }
+
+  /* ---- top bar ---- */
+  #topbar{
+    flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+    padding:16px 20px 10px;
+  }
+  .brand{display:flex;flex-direction:column;line-height:1}
+  .brand b{font-size:20px;font-weight:600;letter-spacing:.3px;color:var(--sea-ink)}
+  .brand small{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--coral-deep);margin-top:3px;font-family:ui-sans-serif,system-ui,sans-serif}
+  .counts{display:flex;gap:14px;font-family:ui-sans-serif,system-ui,sans-serif}
+  .count{display:flex;flex-direction:column;align-items:flex-end;line-height:1.1}
+  .count b{font-size:17px;color:var(--sea-ink);font-weight:700}
+  .count span{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--ink-soft)}
+
+  /* ---- screens ---- */
+  .screen{flex:1 1 auto;position:relative;display:none;flex-direction:column;min-height:0}
+  .screen.active{display:flex}
+
+  /* ---- PLAY screen ---- */
+  #seedline{
+    text-align:center;padding:2px 24px 10px;
+  }
+  #seedline .seed-name{font-size:15px;color:var(--coral-deep);font-style:italic}
+  #seedline .seed-hint{font-size:11px;color:var(--ink-soft);margin-top:3px;font-family:ui-sans-serif,system-ui,sans-serif}
+
+  #trayWrap{
+    flex:1 1 auto;position:relative;margin:0 18px;min-height:0;
+    border-radius:26px;
+    background:
+      radial-gradient(130% 100% at 50% 0%, #FBF4E6 0%, var(--sand) 60%, var(--sand-deep) 100%);
+    box-shadow:inset 0 2px 10px rgba(180,160,120,.35), inset 0 0 0 1px rgba(220,208,184,.8),0 8px 20px -12px var(--shadow);
+    overflow:hidden;
+    touch-action:none;
+  }
+  #tray{position:absolute;inset:0;width:100%;height:100%;display:block}
+  /* order meter on tray */
+  #orderBadge{
+    position:absolute;top:12px;left:50%;transform:translateX(-50%);
+    background:rgba(255,253,248,.86);backdrop-filter:blur(4px);
+    border:1px solid rgba(220,208,184,.9);
+    border-radius:999px;padding:5px 14px 5px 10px;
+    display:flex;align-items:center;gap:9px;
+    font-family:ui-sans-serif,system-ui,sans-serif;
+    box-shadow:0 4px 12px -6px var(--shadow);
+    pointer-events:none;
+  }
+  #orderTrack{width:88px;height:7px;border-radius:99px;background:var(--sand-deep);overflow:hidden;position:relative}
+  #orderFill{position:absolute;left:0;top:0;height:100%;width:0%;
+    background:linear-gradient(90deg,var(--sea),var(--sea-deep));border-radius:99px;transition:width .18s ease-out}
+  #orderTxt{font-size:11px;font-weight:700;color:var(--sea-ink);min-width:30px}
+  #orderLbl{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--ink-soft)}
+
+  #coach{
+    position:absolute;left:50%;bottom:16px;transform:translateX(-50%);
+    background:rgba(46,89,87,.86);color:#F3ECDB;
+    font-family:ui-sans-serif,system-ui,sans-serif;font-size:11.5px;
+    padding:8px 16px;border-radius:999px;white-space:nowrap;
+    box-shadow:0 6px 16px -8px rgba(0,0,0,.4);
+    transition:opacity .4s; pointer-events:none;max-width:90%;
+  }
+
+  /* ---- play controls ---- */
+  #playctl{flex:0 0 auto;padding:16px 18px calc(16px + env(safe-area-inset-bottom));display:flex;gap:12px;align-items:center}
+  .btn{
+    font-family:ui-sans-serif,system-ui,sans-serif;font-weight:700;letter-spacing:.4px;
+    border:none;cursor:pointer;border-radius:16px;font-size:14px;
+    transition:transform .12s ease,box-shadow .2s,background .2s;
+    display:flex;align-items:center;justify-content:center;gap:7px;
+  }
+  .btn:active{transform:scale(.96)}
+  .btn-primary{
+    flex:1;padding:15px;color:#FFFDF8;
+    background:linear-gradient(180deg,var(--coral) 0%,var(--coral-deep) 100%);
+    box-shadow:0 8px 18px -8px rgba(196,106,76,.8),inset 0 1px 0 rgba(255,255,255,.3);
+  }
+  .btn-primary:disabled{background:var(--sand-deep);color:#B6A988;box-shadow:none;cursor:default}
+  .btn-ghost{
+    padding:15px 18px;color:var(--sea-ink);background:var(--shell);
+    box-shadow:0 4px 10px -6px var(--shadow),inset 0 0 0 1px var(--line);
+  }
+
+  /* ---- bottom nav ---- */
+  #nav{
+    flex:0 0 auto;display:flex;border-top:1px solid var(--line);background:var(--shell);
+  }
+  .navbtn{
+    flex:1;padding:11px 0 calc(11px + env(safe-area-inset-bottom));background:none;border:none;cursor:pointer;
+    font-family:ui-sans-serif,system-ui,sans-serif;font-size:9.5px;letter-spacing:1.2px;text-transform:uppercase;
+    color:var(--ink-soft);display:flex;flex-direction:column;align-items:center;gap:5px;transition:color .2s;
+  }
+  .navbtn .ic{width:22px;height:22px;display:block}
+  .navbtn.on{color:var(--coral-deep)}
+  .navbtn.on .ic{transform:translateY(-1px)}
+
+  /* ---- COLLECTION screen ---- */
+  #collScroll{flex:1;overflow-y:auto;padding:6px 18px 18px}
+  .coll-head{font-family:ui-sans-serif,system-ui,sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink-soft);margin:14px 4px 10px;display:flex;justify-content:space-between;align-items:baseline}
+  .coll-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .ccard{
+    background:var(--shell);border-radius:18px;padding:14px 12px 12px;cursor:pointer;
+    box-shadow:0 6px 14px -10px var(--shadow),inset 0 0 0 1px var(--line);
+    display:flex;flex-direction:column;align-items:center;gap:7px;position:relative;
+    transition:transform .14s;
+  }
+  .ccard:active{transform:scale(.97)}
+  .ccard canvas{width:74px;height:74px}
+  .ccard .cname{font-size:14px;color:var(--sea-ink);font-weight:600}
+  .ccard .crare{font-family:ui-sans-serif,system-ui,sans-serif;font-size:8.5px;letter-spacing:1.4px;text-transform:uppercase;padding:2px 8px;border-radius:99px}
+  .r-common{background:#EAE0CB;color:#8A7A55}
+  .r-uncommon{background:#D7E9DD;color:#3E7A58}
+  .r-rare{background:#D9E4F2;color:#3D6597}
+  .r-radiant{background:#F3E2C0;color:#B07E22}
+  .empty-note{grid-column:1/-1;text-align:center;color:var(--ink-soft);font-family:ui-sans-serif,system-ui,sans-serif;font-size:13px;padding:50px 20px;line-height:1.7}
+  .empty-note b{display:block;color:var(--sea-ink);font-size:15px;margin-bottom:6px;font-family:inherit}
+
+  /* ---- modal ---- */
+  #modal{position:absolute;inset:0;z-index:40;display:none;align-items:center;justify-content:center;padding:24px}
+  #modal.show{display:flex}
+  #scrim{position:absolute;inset:0;background:rgba(46,57,55,.55);backdrop-filter:blur(3px)}
+  #sheet{
+    position:relative;width:100%;max-width:330px;background:var(--sky);
+    border-radius:26px;padding:24px 22px 20px;text-align:center;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,.5);
+    animation:rise .4s cubic-bezier(.2,.9,.3,1.1);
+  }
+  @keyframes rise{from{transform:translateY(28px) scale(.96);opacity:0}to{transform:none;opacity:1}}
+  .m-eyebrow{font-family:ui-sans-serif,system-ui,sans-serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--coral-deep)}
+  #mStage{width:150px;height:150px;margin:8px auto 4px}
+  .m-name{font-size:25px;font-weight:600;color:var(--sea-ink);letter-spacing:.3px}
+  .m-rare{display:inline-block;font-family:ui-sans-serif,system-ui,sans-serif;font-size:9px;letter-spacing:1.6px;text-transform:uppercase;padding:3px 11px;border-radius:99px;margin-top:7px}
+  .m-quote{font-style:italic;color:var(--ink);font-size:14.5px;line-height:1.55;margin:14px 6px 4px;min-height:42px}
+  .m-traits{display:flex;flex-direction:column;gap:8px;margin:16px 4px 6px;font-family:ui-sans-serif,system-ui,sans-serif}
+  .trait{display:flex;align-items:center;gap:10px}
+  .trait .tl{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-soft);width:78px;text-align:left}
+  .trait .tb{flex:1;height:6px;border-radius:99px;background:var(--sand-deep);overflow:hidden}
+  .trait .tf{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--gold),var(--gold-deep));width:0;transition:width .8s cubic-bezier(.2,.9,.3,1)}
+  .m-origin{font-family:ui-sans-serif,system-ui,sans-serif;font-size:10.5px;color:var(--ink-soft);line-height:1.5;margin:12px 8px 0;padding-top:12px;border-top:1px solid var(--line)}
+  .m-btn{margin-top:16px;width:100%;padding:14px;border:none;border-radius:15px;cursor:pointer;
+    font-family:ui-sans-serif,system-ui,sans-serif;font-weight:700;font-size:14px;letter-spacing:.4px;color:#FFFDF8;
+    background:linear-gradient(180deg,var(--sea) 0%,var(--sea-deep) 100%);
+    box-shadow:0 8px 16px -8px rgba(79,138,135,.8)}
+  .m-btn.alt{background:var(--shell);color:var(--sea-ink);box-shadow:inset 0 0 0 1px var(--line);margin-top:9px}
+
+  /* island/soul card */
+  .soul-row{display:flex;align-items:center;gap:14px;background:var(--shell);border-radius:18px;padding:13px;margin-bottom:11px;
+    box-shadow:0 5px 12px -9px var(--shadow),inset 0 0 0 1px var(--line)}
+  .soul-row canvas{width:62px;height:62px;flex:0 0 auto}
+  .soul-info{flex:1;min-width:0}
+  .soul-info .sn{font-size:16px;color:var(--sea-ink);font-weight:600;display:flex;align-items:center;gap:7px}
+  .soul-mood{font-size:8px;letter-spacing:1px;text-transform:uppercase;font-family:ui-sans-serif,system-ui,sans-serif;padding:2px 7px;border-radius:99px;background:#E7EFE6;color:#4d7a52}
+  .soul-info .sq{font-style:italic;font-size:12.5px;color:var(--ink-soft);margin-top:4px;line-height:1.4}
+  .pet-btn{flex:0 0 auto;width:42px;height:42px;border-radius:50%;border:none;cursor:pointer;background:var(--sand);
+    box-shadow:inset 0 0 0 1px var(--line);font-size:17px;transition:transform .12s,background .2s}
+  .pet-btn:active{transform:scale(.9);background:var(--gold)}
+  #islandIntro{font-family:ui-sans-serif,system-ui,sans-serif;font-size:12.5px;color:var(--ink-soft);line-height:1.7;text-align:center;padding:24px 16px;background:var(--shell);border-radius:18px;margin-top:8px;box-shadow:inset 0 0 0 1px var(--line)}
+  #islandIntro b{color:var(--sea-ink);display:block;font-size:15px;margin-bottom:7px;font-family:Iowan Old Style,Palatino,Georgia,serif;font-weight:600}
+
+  .hatching-pulse{position:absolute;inset:0;background:radial-gradient(circle at center,rgba(229,180,90,.5),transparent 65%);opacity:0;pointer-events:none}
+
+  ::-webkit-scrollbar{width:0}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <div class="brand"><b>Tideweaver</b><small>Prototype</small></div>
+    <div class="counts">
+      <div class="count"><b id="cDay">1</b><span>Day</span></div>
+      <div class="count"><b id="cCreat">0</b><span>Creatures</span></div>
+    </div>
+  </div>
+
+  <!-- ============ PLAY ============ -->
+  <section class="screen active" id="scrPlay">
+    <div id="seedline">
+      <div class="seed-name" id="seedName">a drifting tide-seed</div>
+      <div class="seed-hint">Sort the living matter by colour. The calmer and tidier you work, the rarer the creature.</div>
+    </div>
+    <div id="trayWrap">
+      <canvas id="tray"></canvas>
+      <div id="orderBadge">
+        <div>
+          <div id="orderLbl">Order</div>
+          <div id="orderTrack"><div id="orderFill"></div></div>
+        </div>
+        <div id="orderTxt">0%</div>
+      </div>
+      <div class="hatching-pulse" id="pulse"></div>
+      <div id="coach">Drag through the matter to gather each colour together</div>
+    </div>
+    <div id="playctl">
+      <button class="btn btn-ghost" id="btnNew" title="New tide">↺</button>
+      <button class="btn btn-primary" id="btnSettle" disabled>Settle the tide</button>
+    </div>
+  </section>
+
+  <!-- ============ ISLAND ============ -->
+  <section class="screen" id="scrIsland">
+    <div id="collScroll">
+      <div class="coll-head" style="margin-top:8px"><span>Your island</span><span id="islandCount"></span></div>
+      <div id="islandList"></div>
+      <div id="islandIntro">
+        <b>Your living island</b>
+        Creatures you hatch live here. Each one thinks, feels, and slowly changes on its own — through pure code, no internet needed. Tap a creature to greet it and watch its mood shift.
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ COLLECTION ============ -->
+  <section class="screen" id="scrColl">
+    <div id="collScroll">
+      <div class="coll-head"><span>Collection</span><span id="collMeta">0 discovered</span></div>
+      <div class="coll-grid" id="collGrid"></div>
+    </div>
+  </section>
+
+  <!-- ============ NAV ============ -->
+  <nav id="nav">
+    <button class="navbtn on" data-screen="scrPlay">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14c2-1 4-1 6 0s4 1 6 0 4-1 4-1"/><path d="M4 18c2-1 4-1 6 0s4 1 6 0 4-1 4-1"/><circle cx="12" cy="7" r="3"/></svg>
+      Tide
+    </button>
+    <button class="navbtn" data-screen="scrIsland">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M5 20c0-5 3-9 7-9s7 4 7 9"/><path d="M12 11V4"/><path d="M12 4c2 0 3 1 3 2"/></svg>
+      Island
+    </button>
+    <button class="navbtn" data-screen="scrColl">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+      Codex
+    </button>
+  </nav>
+
+  <!-- ============ MODAL ============ -->
+  <div id="modal">
+    <div id="scrim"></div>
+    <div id="sheet">
+      <div class="m-eyebrow" id="mEyebrow">A new soul stirs</div>
+      <canvas id="mStage" width="300" height="300"></canvas>
+      <div class="m-name" id="mName">—</div>
+      <div><span class="m-rare" id="mRare">common</span></div>
+      <div class="m-quote" id="mQuote">…</div>
+      <div class="m-traits" id="mTraits"></div>
+      <div class="m-origin" id="mOrigin"></div>
+      <button class="m-btn" id="mKeep">Welcome it to your island</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   TIDEWEAVER — single-player prototype
+   Core: GravelGarden physics -> Echo Genetics -> creature
+   ============================================================ */
+
+/* ---------- palette of species (the "living matter" colours) ---------- */
+const SPECIES = [
+  {name:"Coral",  c:"#E5896B", c2:"#C8674A"},
+  {name:"Sea",    c:"#5FA8A2", c2:"#3C807B"},
+  {name:"Gold",   c:"#E7B85B", c2:"#C8923A"},
+  {name:"Lilac",  c:"#A88FC4", c2:"#866BA6"},
+  {name:"Reef",   c:"#7BBE7E", c2:"#549457"},
+];
+
+/* ---------- creature name pools (by temperament) ---------- */
+const NAME_PARTS = {
+  pre:["Mu","Pip","Bo","Lun","Tas","Wis","Fen","Ko","Sol","Dap","Nim","Ari","Pud","Oro","Bib","Quil","Mar","Sef","Tan","Lo"],
+  suf:["ko","ble","by","een","sel","win","pa","mo","ra","let","fin","dle","mi","sk","na","oa","pin","et","lu","ka"]
+};
+
+/* ---------- soul-engine dialogue templates ---------- */
+const GREET = {
+  warm:["Oh — there you are.","I hoped you'd come by.","You came at just the right moment.","Hello, friend."],
+  shy:["Oh. Hello.","...you're here.","Mm. Hi.","Didn't hear you come in."],
+  bright:["You're back! Wonderful!","Hi hi hi!","I was just about to look for you!","There you are at last!"]
+};
+const MOODLINE = {
+  content:["The morning feels soft today.","Everything is just so.","I've been watching the tide come in.","All is calm here."],
+  restless:["I keep wanting to wander.","Something's stirring in me today.","I can't sit still, somehow.","The far shore is calling."],
+  fond:["I was thinking of you, actually.","It's nicer when you visit.","You always settle me.","I saved the good spot for you."],
+  sleepy:["I might curl up soon...","The sun makes me drowsy.","Just resting my eyes.","Mmm... five more minutes."]
+};
+const PETLINE = {
+  warm:["That's lovely.","Mmm, thank you.","I could stay like this.","You're kind to me."],
+  shy:["Oh! ...that's nice.","Eep — okay.","...I don't mind that.","Heh."],
+  bright:["Again! Again!","Hehe, that tickles!","Best day!","Yay!"]
+};
+
+/* ---------- seed flavour names ---------- */
+const SEEDS = ["a drifting tide-seed","a dawn-washed seed","a barnacled little seed",
+  "a seed wrapped in kelp","a sun-warmed seed","a seed from the deep current",
+  "a moon-pale seed","a seed that hums faintly"];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const State = {
+  day:1,
+  creatures:[],          // owned
+  codex:{},              // name -> rarity discovered
+  speciesCount:3,        // grows a touch over days
+};
+
+/* ============================================================
+   PHYSICS — GravelGarden
+   ============================================================ */
+const tray = document.getElementById('tray');
+const tctx = tray.getContext('2d');
+let P=[];                // particles
+let W=0,Hh=0,DPR=1;
+let running=true;
+
+/* echo-genetics accumulators (HOW the player tidies) */
+let echo = freshEcho();
+function freshEcho(){
+  return {
+    moves:0, dragDist:0, dragTime:0, idleTime:0,
+    speedSamples:[], smoothSamples:[],
+    lastT:0, started:false, totalTime:0,
+    maxOrder:0,
+  };
+}
+
+function sizeTray(){
+  const r=tray.getBoundingClientRect();
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  W=r.width; Hh=r.height;
+  tray.width=W*DPR; tray.height=Hh*DPR;
+  tctx.setTransform(DPR,0,0,DPR,0,0);
+}
+
+function spawnTide(){
+  sizeTray();
+  P=[];
+  echo=freshEcho();
+  const n = Math.min(46 + State.speciesCount*8, 78);
+  const k = State.speciesCount;
+  for(let i=0;i<n;i++){
+    const sp=i % k;
+    P.push({
+      x: 30 + Math.random()*(W-60),
+      y: 30 + Math.random()*(Hh-60),
+      vx:0, vy:0,
+      r: 8.5 + Math.random()*3.2,
+      sp,
+      jx:(Math.random()-.5)*0.4, jy:(Math.random()-.5)*0.4, // tiny idle jitter
+      ph:Math.random()*6.28,
+    });
+  }
+  // little settling shuffle
+  for(let s=0;s<40;s++) physicsStep(0.7,true);
+  updateOrder(true);
+  setSettle(false);
+  showCoach("Drag through the matter to gather each colour together");
+}
+
+/* spatial-hash neighbour resolve + cohesion-by-species */
+function physicsStep(dt, quiet){
+  const n=P.length;
+  // integrate + walls + idle jitter
+  for(let i=0;i<n;i++){
+    const p=P[i];
+    if(!quiet){
+      p.ph+=0.03;
+      p.vx += Math.cos(p.ph)*p.jx*0.04;
+      p.vy += Math.sin(p.ph*1.1)*p.jy*0.04;
+    }
+    p.x+=p.vx*dt; p.y+=p.vy*dt;
+    p.vx*=0.86; p.vy*=0.86;
+    const r=p.r;
+    if(p.x<r){p.x=r;p.vx*=-.4} if(p.x>W-r){p.x=W-r;p.vx*=-.4}
+    if(p.y<r){p.y=r;p.vy*=-.4} if(p.y>Hh-r){p.y=Hh-r;p.vy*=-.4}
+  }
+  // pairwise (n is small) — collision + same-species magnetic snap
+  for(let i=0;i<n;i++){
+    const a=P[i];
+    for(let j=i+1;j<n;j++){
+      const b=P[j];
+      let dx=b.x-a.x, dy=b.y-a.y;
+      let d2=dx*dx+dy*dy;
+      const minD=a.r+b.r;
+      if(d2<minD*minD && d2>0.0001){
+        const d=Math.sqrt(d2);
+        const ov=(minD-d)/d*0.5;
+        const ox=dx*ov, oy=dy*ov;
+        a.x-=ox; a.y-=oy; b.x+=ox; b.y+=oy;
+        // soft restitution
+        a.vx-=ox*0.3; a.vy-=oy*0.3; b.vx+=ox*0.3; b.vy+=oy*0.3;
+      }
+      // magnetic attraction for same species at mid range -> snapping/clumping
+      else if(a.sp===b.sp && d2<(minD*3.4)*(minD*3.4)){
+        const d=Math.sqrt(d2);
+        const f=0.020*(1-d/(minD*3.4));
+        const fx=dx/d*f, fy=dy/d*f;
+        a.vx+=fx; a.vy+=fy; b.vx-=fx; b.vy-=fy;
+      }
+    }
+  }
+}
+
+/* ---------- ORDER FIELD (real, simplified) ---------- */
+/* measure: for each particle, fraction of near neighbours that share species.
+   global order = mean of that, remapped. high when colours are well separated. */
+let curOrder=0;
+function updateOrder(snap){
+  const n=P.length; if(!n){curOrder=0;return;}
+  let acc=0, counted=0;
+  for(let i=0;i<n;i++){
+    const a=P[i];
+    let same=0,tot=0;
+    const R=(a.r*4.2); const R2=R*R;
+    for(let j=0;j<n;j++){
+      if(i===j)continue;
+      const b=P[j];
+      const dx=b.x-a.x,dy=b.y-a.y,d2=dx*dx+dy*dy;
+      if(d2<R2){tot++; if(b.sp===a.sp)same++;}
+    }
+    if(tot>0){acc += same/tot; counted++;}
+  }
+  let raw = counted? acc/counted : 0;
+  // baseline for random mix ~ 1/species; remap to 0..1
+  const base = 1/State.speciesCount;
+  let o = (raw-base)/(1-base);
+  o = Math.max(0,Math.min(1,o));
+  // ease the displayed value
+  curOrder = snap? o : curOrder + (o-curOrder)*0.25;
+  if(curOrder>echo.maxOrder) echo.maxOrder=curOrder;
+
+  const pct=Math.round(curOrder*100);
+  document.getElementById('orderFill').style.width=pct+'%';
+  document.getElementById('orderTxt').textContent=pct+'%';
+  setSettle(curOrder>=0.34);
+
+  // coaching cues
+  if(curOrder>0.7) showCoach("Beautiful — the matter is almost in harmony");
+  else if(curOrder>0.45) showCoach("It's coming together nicely");
+}
+
+/* ---------- render ---------- */
+function draw(){
+  tctx.clearRect(0,0,W,Hh);
+  // soft species "territory" glows under clusters (reads as tidiness)
+  // draw particles as soft metaball-ish blobs
+  for(let i=0;i<P.length;i++){
+    const p=P[i], s=SPECIES[p.sp];
+    // glow
+    const g=tctx.createRadialGradient(p.x,p.y,1,p.x,p.y,p.r*1.7);
+    g.addColorStop(0,s.c); g.addColorStop(1,s.c+"00");
+    tctx.globalAlpha=0.5; tctx.fillStyle=g;
+    tctx.beginPath(); tctx.arc(p.x,p.y,p.r*1.7,0,6.2832); tctx.fill();
+    // core
+    tctx.globalAlpha=1;
+    const cg=tctx.createRadialGradient(p.x-p.r*0.3,p.y-p.r*0.35,1,p.x,p.y,p.r);
+    cg.addColorStop(0,lighten(s.c,18)); cg.addColorStop(1,s.c2);
+    tctx.fillStyle=cg;
+    tctx.beginPath(); tctx.arc(p.x,p.y,p.r,0,6.2832); tctx.fill();
+    // tiny highlight
+    tctx.globalAlpha=.5; tctx.fillStyle="#FFFFFF";
+    tctx.beginPath(); tctx.arc(p.x-p.r*0.32,p.y-p.r*0.36,p.r*0.26,0,6.2832); tctx.fill();
+    tctx.globalAlpha=1;
+  }
+}
+
+function loop(t){
+  if(running){
+    physicsStep(1.0,false);
+    // accumulate idle time for echo
+    if(echo.started){
+      const now=performance.now();
+      if(!dragging) echo.idleTime += 16;
+      echo.totalTime += 16;
+    }
+    if(frame%4===0) updateOrder(false);
+    draw();
+  }
+  frame++;
+  requestAnimationFrame(loop);
+}
+let frame=0;
+
+/* ============================================================
+   INPUT — drag creates a velocity field (the "thumb")
+   ============================================================ */
+let dragging=false, lastX=0,lastY=0,lastMoveT=0;
+function pt(e){
+  const r=tray.getBoundingClientRect();
+  const t=e.touches?e.touches[0]:e;
+  return {x:t.clientX-r.left, y:t.clientY-r.top};
+}
+function onDown(e){
+  e.preventDefault();
+  dragging=true;
+  const q=pt(e); lastX=q.x; lastY=q.y; lastMoveT=performance.now();
+  if(!echo.started){echo.started=true;}
+  hideCoach();
+}
+function onMove(e){
+  if(!dragging)return;
+  e.preventDefault();
+  const q=pt(e);
+  const now=performance.now();
+  const dx=q.x-lastX, dy=q.y-lastY;
+  const dist=Math.hypot(dx,dy);
+  const dtm=Math.max(now-lastMoveT,1);
+  const speed=dist/dtm; // px per ms
+
+  echo.moves++;
+  echo.dragDist+=dist;
+  echo.dragTime+=dtm;
+  echo.speedSamples.push(speed);
+  // smoothness: change in direction (low = smooth)
+  if(echo._lx!==undefined){
+    const a1=Math.atan2(echo._ly,echo._lx), a2=Math.atan2(dy,dx);
+    let da=Math.abs(a1-a2); if(da>Math.PI)da=2*Math.PI-da;
+    echo.smoothSamples.push(da);
+  }
+  echo._lx=dx; echo._ly=dy;
+
+  // push particles within brush radius
+  const R=46, R2=R*R;
+  for(let i=0;i<P.length;i++){
+    const p=P[i];
+    const ex=p.x-q.x, ey=p.y-q.y, d2=ex*ex+ey*ey;
+    if(d2<R2){
+      const d=Math.sqrt(d2)||1;
+      const fall=1-d/R;
+      // carry in drag direction + slight outward
+      p.vx += dx*0.55*fall + (ex/d)*0.4*fall;
+      p.vy += dy*0.55*fall + (ey/d)*0.4*fall;
+    }
+  }
+  lastX=q.x; lastY=q.y; lastMoveT=now;
+}
+function onUp(){dragging=false; echo._lx=undefined;}
+
+tray.addEventListener('mousedown',onDown);
+tray.addEventListener('mousemove',onMove);
+window.addEventListener('mouseup',onUp);
+tray.addEventListener('touchstart',onDown,{passive:false});
+tray.addEventListener('touchmove',onMove,{passive:false});
+window.addEventListener('touchend',onUp);
+
+/* ============================================================
+   ECHO GENETICS -> CREATURE
+   The way you tidied becomes the genome.
+   ============================================================ */
+function avg(a){return a.length? a.reduce((x,y)=>x+y,0)/a.length : 0;}
+
+function deriveGenome(){
+  const order = echo.maxOrder;                       // tidiness achieved
+  const meanSpeed = avg(echo.speedSamples);          // px/ms
+  const meanTurn  = avg(echo.smoothSamples);         // radians (low=smooth)
+  const idleFrac  = echo.totalTime? echo.idleTime/echo.totalTime : 0.5;
+
+  // normalise to 0..1 traits
+  const patience  = clamp01( 0.5*(1-norm(meanSpeed,0.05,0.9)) + 0.5*norm(idleFrac,0.1,0.7) );
+  const energy    = clamp01( norm(meanSpeed,0.05,0.95) );
+  const grace     = clamp01( 1 - norm(meanTurn,0.15,1.25) );      // smooth = graceful
+  const focus     = clamp01( order );                            // tidiness = focus
+  const curiosity = clamp01( 0.45 + (norm(meanTurn,0.1,1.3)-0.5)*0.7 ); // wandery hands = curious
+
+  // temperament archetype from traits
+  let temperament;
+  if(energy>0.6 && curiosity>0.5) temperament="bright";
+  else if(patience>0.58 || grace>0.62) temperament="warm";
+  else temperament="shy";
+
+  // rarity from order (focus) + grace
+  const q = focus*0.7 + grace*0.3;
+  let rarity, rkey;
+  if(q>0.82){rarity="Radiant";rkey="r-radiant";}
+  else if(q>0.62){rarity="Rare";rkey="r-rare";}
+  else if(q>0.42){rarity="Uncommon";rkey="r-uncommon";}
+  else {rarity="Common";rkey="r-common";}
+
+  // visual genes derived from traits (deterministic-ish + a little chance)
+  const hue = pick([14,168,42,265,128])[0]!==undefined ? 0 : 0; // placeholder
+  const baseHues=[14,168,42,272,130];
+  const dominant = baseHues[ Math.floor(curiosity*baseHues.length)%baseHues.length ];
+  const accent   = baseHues[ (Math.floor(energy*baseHues.length)+2)%baseHues.length ];
+  const blobLen  = 0.7 + energy*0.5;      // body squish
+  const earSize  = 0.5 + curiosity*0.9;
+  const eyeBig   = 0.6 + (1-energy)*0.6;
+  const spots    = Math.round(focus*5);
+  const wiggly   = grace;
+
+  return {
+    traits:{patience,energy,grace,focus,curiosity},
+    temperament, rarity, rkey,
+    genes:{dominant,accent,blobLen,earSize,eyeBig,spots,wiggly},
+    origin: originLine(order,meanSpeed,meanTurn),
+  };
+}
+
+function originLine(order,spd,turn){
+  const parts=[];
+  if(order>0.7) parts.push("born of a beautifully ordered tide");
+  else if(order>0.45) parts.push("shaped from a tide brought to gentle order");
+  else parts.push("hatched from a lively, half-wild tide");
+  if(spd<0.25) parts.push("settled by patient hands");
+  else if(spd>0.6) parts.push("stirred by quick, eager hands");
+  else parts.push("coaxed at an easy pace");
+  if(turn<0.4) parts.push("with long, smooth strokes");
+  return cap(parts.join(", "))+".";
+}
+
+function makeName(temperament){
+  const a=pick(NAME_PARTS.pre), b=pick(NAME_PARTS.suf);
+  let n=a+b;
+  // ensure not owned twice w/ same name
+  let tries=0;
+  while(State.creatures.some(c=>c.name===n) && tries<12){ n=pick(NAME_PARTS.pre)+pick(NAME_PARTS.suf); tries++;}
+  return n;
+}
+
+/* ============================================================
+   CREATURE RENDERER (procedural, from genes)
+   ============================================================ */
+function drawCreature(ctx, cx, cy, scale, g, traits, t, mood){
+  t=t||0;
+  const breathe = Math.sin(t*1.8)*0.02*scale + scale;
+  const sway = Math.sin(t*1.2)*4*g.wiggly;
+  const s=breathe;
+  const bodyW=46*s*(0.85+g.blobLen*0.2);
+  const bodyH=50*s*(1.15-g.blobLen*0.2);
+
+  ctx.save();
+  ctx.translate(cx+sway,cy);
+
+  // shadow
+  ctx.globalAlpha=.13; ctx.fillStyle="#2E5957";
+  ctx.beginPath(); ctx.ellipse(0,bodyH*0.62,bodyW*0.7,9*s,0,0,6.2832); ctx.fill();
+  ctx.globalAlpha=1;
+
+  const col=`hsl(${g.dominant},58%,64%)`;
+  const colD=`hsl(${g.dominant},52%,50%)`;
+  const colL=`hsl(${g.dominant},62%,76%)`;
+  const acc=`hsl(${g.accent},60%,62%)`;
+
+  // ears / antennae (size from curiosity)
+  ctx.strokeStyle=colD; ctx.lineCap="round";
+  ctx.lineWidth=5*s;
+  const eL=22*s*g.earSize;
+  for(const side of [-1,1]){
+    const bx=side*bodyW*0.34, by=-bodyH*0.42;
+    const wob=Math.sin(t*2 + (side>0?0:1.5))*5*g.wiggly;
+    ctx.beginPath(); ctx.moveTo(bx,by);
+    ctx.quadraticCurveTo(bx+side*6*s, by-eL*0.6, bx+side*3*s+wob, by-eL);
+    ctx.stroke();
+    ctx.fillStyle=acc;
+    ctx.beginPath(); ctx.arc(bx+side*3*s+wob, by-eL, 4.4*s, 0,6.2832); ctx.fill();
+  }
+
+  // body
+  const bg=ctx.createLinearGradient(0,-bodyH*0.5,0,bodyH*0.6);
+  bg.addColorStop(0,colL); bg.addColorStop(1,colD);
+  ctx.fillStyle=bg;
+  blob(ctx,0,0,bodyW,bodyH);
+  ctx.fill();
+
+  // belly patch
+  ctx.fillStyle="rgba(255,255,255,.32)";
+  blob(ctx,0,bodyH*0.16,bodyW*0.6,bodyH*0.5);
+  ctx.fill();
+
+  // spots (count from focus)
+  ctx.fillStyle=`hsla(${g.accent},60%,55%,.55)`;
+  for(let i=0;i<g.spots;i++){
+    const ang=i/Math.max(g.spots,1)*6.2832+0.6;
+    const rr=bodyW*0.42;
+    ctx.beginPath(); ctx.arc(Math.cos(ang)*rr*0.7, Math.sin(ang)*rr*0.5 - bodyH*0.06, 3.4*s,0,6.2832); ctx.fill();
+  }
+
+  // eyes (size from calm), blink
+  const blink = (Math.sin(t*0.7)>0.97)?0.12:1;
+  const eo=bodyW*0.24, ey=-bodyH*0.06, er=6.2*s*g.eyeBig;
+  for(const side of [-1,1]){
+    ctx.fillStyle="#FFFFFF";
+    ctx.beginPath(); ctx.ellipse(side*eo,ey,er,er*blink,0,0,6.2832); ctx.fill();
+    ctx.fillStyle="#33413F";
+    const look=Math.sin(t*0.5)*er*0.18;
+    ctx.beginPath(); ctx.ellipse(side*eo+look,ey,er*0.52,er*0.52*blink,0,0,6.2832); ctx.fill();
+    if(blink>0.5){ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(side*eo+look-er*0.18,ey-er*0.2,er*0.16,0,6.2832);ctx.fill();}
+  }
+
+  // cheeks if warm/bright
+  if(mood!=="sleepy"){
+    ctx.fillStyle="rgba(229,137,107,.4)";
+    for(const side of [-1,1]){ctx.beginPath();ctx.arc(side*bodyW*0.42,ey+er*1.3,4*s,0,6.2832);ctx.fill();}
+  }
+
+  // mouth by mood
+  ctx.strokeStyle="#33413F"; ctx.lineWidth=2.2*s; ctx.lineCap="round";
+  const my=ey+er*1.7;
+  ctx.beginPath();
+  if(mood==="sleepy"){ctx.moveTo(-4*s,my);ctx.lineTo(4*s,my);}
+  else if(mood==="restless"){ctx.moveTo(-4*s,my+1);ctx.quadraticCurveTo(0,my-1,4*s,my+1);}
+  else {ctx.moveTo(-5*s,my-1);ctx.quadraticCurveTo(0,my+4*s,5*s,my-1);} // smile
+  ctx.stroke();
+
+  ctx.restore();
+}
+function blob(ctx,cx,cy,w,h){
+  ctx.beginPath();
+  ctx.moveTo(cx,cy-h*0.5);
+  ctx.bezierCurveTo(cx+w*0.62,cy-h*0.52, cx+w*0.6,cy+h*0.5, cx,cy+h*0.52);
+  ctx.bezierCurveTo(cx-w*0.6,cy+h*0.5, cx-w*0.62,cy-h*0.52, cx,cy-h*0.5);
+  ctx.closePath();
+}
+
+/* ============================================================
+   HATCH FLOW
+   ============================================================ */
+const btnSettle=document.getElementById('btnSettle');
+function setSettle(on){ btnSettle.disabled=!on; }
+
+btnSettle.addEventListener('click',()=>{
+  if(btnSettle.disabled)return;
+  running=false;
+  // pulse
+  const pulse=document.getElementById('pulse');
+  pulse.style.transition='opacity .5s'; pulse.style.opacity='1';
+  // gather animation: pull all particles to center quickly
+  let f=0;
+  const cx=W/2, cy=Hh/2;
+  const gather=setInterval(()=>{
+    f++;
+    for(const p of P){p.x+=(cx-p.x)*0.18; p.y+=(cy-p.y)*0.18; p.r*=0.96;}
+    draw();
+    if(f>16){clearInterval(gather); pulse.style.opacity='0'; openHatch();}
+  },24);
+});
+
+let pendingCreature=null, mStageT=0, mStageRAF=0;
+function openHatch(){
+  const gm=deriveGenome();
+  const name=makeName(gm.temperament);
+  const mood = gm.temperament==="bright"?"content": gm.temperament==="warm"?"fond":"content";
+  pendingCreature={
+    name, ...gm, mood,
+    // soul-engine live state
+    soul:{ needs:{company:.4,rest:.3,play:.5}, moodKey:mood, drift:0 },
+    born:State.day,
+  };
+
+  // fill modal
+  document.getElementById('mName').textContent=name;
+  const rEl=document.getElementById('mRare');
+  rEl.textContent=gm.rarity; rEl.className="m-rare "+gm.rkey;
+  document.getElementById('mEyebrow').textContent =
+    gm.rarity==="Radiant" ? "A radiant soul awakens" :
+    gm.rarity==="Rare" ? "A rare soul stirs" : "A new soul stirs";
+  document.getElementById('mOrigin').textContent=gm.origin;
+  // quote
+  document.getElementById('mQuote').textContent =
+    "“"+pick(GREET[gm.temperament])+" "+pick(MOODLINE[mood])+"”";
+  // traits
+  const tr=document.getElementById('mTraits'); tr.innerHTML="";
+  const order=[["Focus",gm.traits.focus],["Patience",gm.traits.patience],
+               ["Energy",gm.traits.energy],["Grace",gm.traits.grace],["Curiosity",gm.traits.curiosity]];
+  for(const [lbl,v] of order){
+    const row=document.createElement('div'); row.className="trait";
+    row.innerHTML=`<div class="tl">${lbl}</div><div class="tb"><div class="tf"></div></div>`;
+    tr.appendChild(row);
+    requestAnimationFrame(()=>{setTimeout(()=>{row.querySelector('.tf').style.width=Math.round(v*100)+'%';},60);});
+  }
+
+  document.getElementById('modal').classList.add('show');
+  // animate creature in modal
+  cancelAnimationFrame(mStageRAF);
+  const sc=document.getElementById('mStage'), sx=sc.getContext('2d');
+  mStageT=0;
+  (function spin(){
+    mStageT+=0.016;
+    sx.clearRect(0,0,300,300);
+    drawCreature(sx,150,158,2.5,pendingCreature.genes,pendingCreature.traits,mStageT,mood);
+    mStageRAF=requestAnimationFrame(spin);
+  })();
+}
+
+document.getElementById('mKeep').addEventListener('click',(e)=>{
+  const keep=e.currentTarget;
+  // "close" mode = just viewing a codex card
+  if(keep.dataset.mode==="close"){
+    keep.dataset.mode=""; keep.textContent="Welcome it to your island";
+    document.getElementById('modal').classList.remove('show');
+    cancelAnimationFrame(mStageRAF);
+    return;
+  }
+  if(pendingCreature){
+    State.creatures.unshift(pendingCreature);
+    State.codex[pendingCreature.name]=pendingCreature.rarity;
+    State.day++;
+    // gently grow variety
+    if(State.day%2===0 && State.speciesCount<5) State.speciesCount++;
+    pendingCreature=null;
+  }
+  cancelAnimationFrame(mStageRAF);
+  document.getElementById('modal').classList.remove('show');
+  refreshCounts(); renderIsland(); renderCodex();
+  // new tide
+  running=true; spawnTide();
+  // nudge to island first time
+  if(State.creatures.length===1){ setTimeout(()=>goScreen('scrIsland'),350); }
+});
+
+/* ============================================================
+   ISLAND (Soul Engine glimpse)
+   ============================================================ */
+function moodTier(c){
+  // derive a display mood from soul needs + base temperament + drift
+  const n=c.soul.needs;
+  if(n.rest>0.75) return "sleepy";
+  if(n.play>0.7 || c.temperament==="bright") return c.soul.moodKey==="restless"?"restless":"content";
+  if(n.company>0.7) return "fond";
+  return c.soul.moodKey;
+}
+const MOOD_LABEL={content:"content",restless:"restless",fond:"fond",sleepy:"sleepy"};
+
+function renderIsland(){
+  const wrap=document.getElementById('islandList');
+  const intro=document.getElementById('islandIntro');
+  document.getElementById('islandCount').textContent =
+     State.creatures.length? State.creatures.length+" living here":"";
+  wrap.innerHTML="";
+  if(!State.creatures.length){intro.style.display="block";return;}
+  intro.style.display="none";
+
+  State.creatures.forEach((c,idx)=>{
+    const row=document.createElement('div'); row.className="soul-row";
+    const cv=document.createElement('canvas'); cv.width=124;cv.height=124;
+    const mt=moodTier(c);
+    const info=document.createElement('div'); info.className="soul-info";
+    info.innerHTML=`<div class="sn">${c.name}<span class="soul-mood">${MOOD_LABEL[mt]||mt}</span></div>
+      <div class="sq">“${pick(MOODLINE[mt]||MOODLINE.content)}”</div>`;
+    const btn=document.createElement('button'); btn.className="pet-btn"; btn.textContent="🤚";
+    btn.title="Greet "+c.name;
+    btn.addEventListener('click',()=>{
+      // soul reacts: lower company need, bump mood, possible drift
+      c.soul.needs.company=Math.max(0,c.soul.needs.company-0.4);
+      c.soul.needs.play=Math.max(0,c.soul.needs.play-0.2);
+      c.soul.moodKey="fond";
+      c.soul.drift+=0.01;
+      info.querySelector('.sq').textContent="“"+pick(PETLINE[c.temperament])+"”";
+      info.querySelector('.soul-mood').textContent="fond";
+      btn.style.background="var(--gold)";
+      setTimeout(()=>btn.style.background="",250);
+    });
+    row.appendChild(cv); row.appendChild(info); row.appendChild(btn);
+    wrap.appendChild(row);
+    // animate this creature
+    animateMini(cv,c,mt);
+  });
+}
+const miniLoops=[];
+function animateMini(cv,c,mt){
+  const x=cv.getContext('2d'); let t=Math.random()*4;
+  function f(){
+    t+=0.016; x.clearRect(0,0,124,124);
+    drawCreature(x,62,68,1.05,c.genes,c.traits,t,mt);
+    cv._raf=requestAnimationFrame(f);
+  } f();
+}
+
+/* simple soul "tick": needs slowly rise over time so moods shift on their own */
+setInterval(()=>{
+  let changed=false;
+  for(const c of State.creatures){
+    const n=c.soul.needs;
+    n.company=Math.min(1,n.company+0.06+Math.random()*0.03);
+    n.rest=Math.min(1,n.rest+0.04);
+    n.play=Math.min(1,n.play+0.05);
+    // occasional self-driven mood shift (autonomy)
+    if(Math.random()<0.25){
+      c.soul.moodKey = pick(["content","restless","fond","sleepy"]);
+      changed=true;
+    }
+  }
+  if(changed && document.getElementById('scrIsland').classList.contains('active')) renderIsland();
+}, 9000);
+
+/* ============================================================
+   CODEX
+   ============================================================ */
+function renderCodex(){
+  const grid=document.getElementById('collGrid');
+  const meta=document.getElementById('collMeta');
+  grid.innerHTML="";
+  const list=State.creatures;
+  meta.textContent=list.length+" discovered";
+  if(!list.length){
+    grid.innerHTML=`<div class="empty-note"><b>No creatures yet</b>Settle your first tide on the Tide screen to hatch a creature. The way you tidy decides who appears.</div>`;
+    return;
+  }
+  list.forEach(c=>{
+    const card=document.createElement('div'); card.className="ccard";
+    const cv=document.createElement('canvas'); cv.width=148;cv.height=148;
+    card.innerHTML=`<div class="cname" style="order:2">${c.name}</div>
+      <div class="crare ${c.rkey}" style="order:3">${c.rarity}</div>`;
+    cv.style.order="1";
+    card.insertBefore(cv,card.firstChild);
+    grid.appendChild(card);
+    const x=cv.getContext('2d'); let t=Math.random()*5;
+    (function f(){t+=0.016;x.clearRect(0,0,148,148);
+      drawCreature(x,74,80,1.32,c.genes,c.traits,t,moodTier(c));
+      cv._raf=requestAnimationFrame(f);})();
+    card.addEventListener('click',()=>showCreatureCard(c));
+  });
+}
+
+function showCreatureCard(c){
+  pendingCreature=null;
+  document.getElementById('mName').textContent=c.name;
+  const rEl=document.getElementById('mRare'); rEl.textContent=c.rarity; rEl.className="m-rare "+c.rkey;
+  document.getElementById('mEyebrow').textContent="From your island";
+  document.getElementById('mOrigin').textContent=c.origin;
+  const mt=moodTier(c);
+  document.getElementById('mQuote').textContent="“"+pick(GREET[c.temperament])+" "+pick(MOODLINE[mt]||MOODLINE.content)+"”";
+  const tr=document.getElementById('mTraits'); tr.innerHTML="";
+  const order=[["Focus",c.traits.focus],["Patience",c.traits.patience],
+               ["Energy",c.traits.energy],["Grace",c.traits.grace],["Curiosity",c.traits.curiosity]];
+  for(const [lbl,v] of order){
+    const row=document.createElement('div'); row.className="trait";
+    row.innerHTML=`<div class="tl">${lbl}</div><div class="tb"><div class="tf"></div></div>`;
+    tr.appendChild(row);
+    requestAnimationFrame(()=>setTimeout(()=>row.querySelector('.tf').style.width=Math.round(v*100)+'%',60));
+  }
+  const keep=document.getElementById('mKeep');
+  keep.textContent="Close"; keep.dataset.mode="close";
+  document.getElementById('modal').classList.add('show');
+  cancelAnimationFrame(mStageRAF);
+  const sc=document.getElementById('mStage'), sx=sc.getContext('2d'); let t=0;
+  (function spin(){t+=0.016;sx.clearRect(0,0,300,300);drawCreature(sx,150,158,2.5,c.genes,c.traits,t,mt);mStageRAF=requestAnimationFrame(spin);})();
+}
+// rebind default keep handler (used after viewing a card)
+function bindKeep(){ /* default handler already attached via addEventListener; this is a no-op guard */ }
+
+/* ============================================================
+   NAV / UI plumbing
+   ============================================================ */
+function goScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id));
+  document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('on',b.dataset.screen===id));
+  if(id==='scrIsland')renderIsland();
+  if(id==='scrColl')renderCodex();
+}
+document.querySelectorAll('.navbtn').forEach(b=>{
+  b.addEventListener('click',()=>goScreen(b.dataset.screen));
+});
+document.getElementById('btnNew').addEventListener('click',()=>{ spawnTide(); });
+document.getElementById('scrim').addEventListener('click',()=>{
+  if(pendingCreature)return; // must choose keep for new hatch
+  document.getElementById('modal').classList.remove('show'); cancelAnimationFrame(mStageRAF);
+});
+
+function refreshCounts(){
+  document.getElementById('cDay').textContent=State.day;
+  document.getElementById('cCreat').textContent=State.creatures.length;
+}
+
+let coachTimer=null;
+function showCoach(msg){
+  const c=document.getElementById('coach');
+  c.textContent=msg; c.style.opacity='1';
+}
+function hideCoach(){
+  const c=document.getElementById('coach');
+  clearTimeout(coachTimer);
+  coachTimer=setTimeout(()=>c.style.opacity='0',400);
+}
+
+/* update seed name each tide */
+function newSeedLabel(){ document.getElementById('seedName').textContent=pick(SEEDS); }
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+function clamp01(v){return Math.max(0,Math.min(1,v));}
+function norm(v,a,b){return clamp01((v-a)/(b-a));}
+function pick(a){return a[Math.floor(Math.random()*a.length)];}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+function lighten(hex,amt){
+  const n=parseInt(hex.slice(1),16);
+  let r=(n>>16)+amt, g=((n>>8)&255)+amt, b=(n&255)+amt;
+  r=Math.min(255,r);g=Math.min(255,g);b=Math.min(255,b);
+  return `rgb(${r},${g},${b})`;
+}
+
+/* wrap spawnTide to also relabel seed */
+const _spawn=spawnTide;
+spawnTide=function(){ _spawn(); newSeedLabel(); };
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+window.addEventListener('resize',()=>{ if(document.getElementById('scrPlay').classList.contains('active')) sizeTray(); });
+refreshCounts();
+spawnTide();
+requestAnimationFrame(loop);
+renderCodex();
+</script>
+</body>
+</html>
